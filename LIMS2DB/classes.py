@@ -490,10 +490,10 @@ class ProjectSQL:
                 where esc.reviewdate is NULL and sa.projectid = {pjid};".format(pjid=self.project.projectid)
         escalations = self.session.query(EscalationEvent).from_statement(text(query)).all()
         if escalations:
-            esc_dict = dict()
+            esc_list = []
             for esc in escalations:
-                esc_dict.update({str(esc.processid) : {'reviwer' : str(esc.reviewer), 'requester' : str(esc.requester)}})
-            self.obj['escalations'] = esc_dict
+                esc_list.append([str(esc.processid), str(esc.reviewer), str(esc.requester)])
+            self.obj['escalations'] = esc_list
 
     def make_normalized_dict(self, d):
         ret = {}

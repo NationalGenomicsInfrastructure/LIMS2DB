@@ -1,6 +1,9 @@
 # LIMS2DB Version Log
 
 ## 20211027.1
+Escalations into list
+
+## 20211027.1
 Refactor escalations to report processid, reviewer and requester
 
 ## 20210707.1
