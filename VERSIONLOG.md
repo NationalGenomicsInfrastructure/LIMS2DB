@@ -2,7 +2,7 @@
 
 ## 20241025.1
 
-Send emails on contract updation for RNA-seq (single cell) projects 
+Send emails on contract update for RNA-seq (single cell) projects.
 
 ## 20241003.1
 
@@ -96,7 +96,8 @@ Add Library prep option to workset key list
 
 Re-define prepstart for the HiC protocol
 
-##20220610.1
+## 20220610.1
+
 Convert statusdb urls to https
 
 ## 20220427.1

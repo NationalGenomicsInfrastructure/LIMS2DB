@@ -1,13 +1,15 @@
+import http.client as http_client
+
+from genologics_sql.utils import get_configuration, get_session
+
 from LIMS2DB.utils import setupLog
-from genologics_sql.utils import get_session, get_configuration
-import six.moves.http_client as http_client
 
 
 def diff_project_objects(pj_id, couch, proj_db, logfile, oconf):
     # Import is put here to defer circular imports
     from LIMS2DB.classes import ProjectSQL
 
-    log = setupLog("diff - {}".format(pj_id), logfile)
+    log = setupLog(f"diff - {pj_id}", logfile)
 
     view = proj_db.view("projects/lims_followed")
 
@@ -15,7 +17,7 @@ def diff_project_objects(pj_id, couch, proj_db, logfile, oconf):
         try:
             old_project_couchid = view[pj_id].rows[0].value
         except (KeyError, IndexError):
-            log.error("No such project {}".format(pj_id))
+            log.error(f"No such project {pj_id}")
             return None
         return old_project_couchid
 
@@ -52,19 +54,19 @@ def diff_objects(o1, o2, parent=""):
     for key in o1:
         if key in o2:
             if isinstance(o1[key], dict):
-                more_diffs = diff_objects(o1[key], o2[key], "{} {}".format(parent, key))
+                more_diffs = diff_objects(o1[key], o2[key], f"{parent} {key}")
                 diffs.update(more_diffs)
             else:
                 if o1[key] != o2[key]:
-                    diffs["{} {}".format(parent, key)] = [o1[key], o2[key]]
+                    diffs[f"{parent} {key}"] = [o1[key], o2[key]]
 
         else:
             if o1[key]:
-                diffs["key {} {}".format(parent, key)] = [o1[key], "missing"]
+                diffs[f"key {parent} {key}"] = [o1[key], "missing"]
 
     for key in o2:
         if key not in o1 and o2[key]:
-            diffs["key {} {}".format(parent, key)] = ["missing", o2[key]]
+            diffs[f"key {parent} {key}"] = ["missing", o2[key]]
 
     return diffs
 

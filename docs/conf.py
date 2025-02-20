@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # PSUL documentation build configuration file, created by
 # sphinx-quickstart on Wed Oct  1 13:40:20 2014.
@@ -11,10 +10,9 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-from __future__ import unicode_literals
-import sys
 import os
-import mock
+import sys
+from unittest import mock
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -200,7 +198,7 @@ htmlhelp_basename = "PSULdoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_elements = {
+latex_elements: dict = {
     # The paper size ('letterpaper' or 'a4paper').
     #'papersize': 'letterpaper',
     # The font size ('10pt', '11pt' or '12pt').

@@ -2,12 +2,14 @@
 
 import argparse
 import os
+
 import yaml
-from genologics.lims import Lims
+from genologics.config import BASEURI, PASSWORD, USERNAME
 from genologics.entities import Project
-from genologics.config import BASEURI, USERNAME, PASSWORD
-import LIMS2DB.utils as lutils
+from genologics.lims import Lims
 from requests.exceptions import HTTPError
+
+import LIMS2DB.utils as lutils
 
 
 def main(args):
@@ -32,27 +34,13 @@ def main(args):
             try:
                 doc = bioinfodb.get(row.id)
             except Exception as e:
-                log.error(
-                    e
-                    + "in Project "
-                    + project_id
-                    + " Sample "
-                    + sample_id
-                    + " while accessing doc from statusdb"
-                )
+                log.error(e + "in Project " + project_id + " Sample " + sample_id + " while accessing doc from statusdb")
             doc["project_closed"] = True
             try:
                 bioinfodb.save(doc)
                 log.info("Updated Project " + project_id + " Sample " + sample_id)
             except Exception as e:
-                log.error(
-                    e
-                    + "in Project "
-                    + project_id
-                    + " Sample "
-                    + sample_id
-                    + " while saving to statusdb"
-                )
+                log.error(e + "in Project " + project_id + " Sample " + sample_id + " while saving to statusdb")
 
 
 if __name__ == "__main__":
