@@ -1,21 +1,18 @@
 import logging
 import logging.handlers
+import multiprocessing as mp
+import queue as Queue
+
+import genologics_sql.tables as gt
+import statusdb.db as sdb
+import yaml
+from genologics.config import BASEURI, PASSWORD, USERNAME
+from genologics.entities import Process
+from genologics.lims import Lims
+from genologics_sql.utils import get_session
+
 import LIMS2DB.classes as lclasses
 import LIMS2DB.utils as lutils
-import multiprocessing as mp
-import statusdb.db as sdb
-
-try:
-    import queue as Queue
-except ImportError:
-    import Queue
-import genologics_sql.tables as gt
-
-from genologics.entities import Process
-from genologics.config import BASEURI, USERNAME, PASSWORD
-from genologics.lims import *
-
-from genologics_sql.utils import *
 
 
 def processWSUL(options, queue, logqueue):
@@ -37,7 +34,7 @@ def processWSUL(options, queue, logqueue):
         # grabs project from queue
         try:
             ws_id = queue.get(block=True, timeout=3)
-            proclog.info("Starting work on {}".format(ws_id))
+            proclog.info(f"Starting work on {ws_id}")
         except Queue.Empty:
             work = False
             proclog.info("exiting gracefully")
@@ -65,17 +62,15 @@ def processWSUL(options, queue, logqueue):
                     ws.obj["_id"] = doc_id
                     ws.obj["_rev"] = doc_rev
                     mycouch.db[doc_id] = ws.obj
-                    proclog.info("updating {0}".format(ws.obj["name"]))
+                    proclog.info(f"updating {ws.obj['name']}")
                 else:
-                    proclog.info("not modifying {0}".format(ws.obj["name"]))
+                    proclog.info(f"not modifying {ws.obj['name']}")
             elif len(view[ws.obj["name"]].rows) == 0:
                 # it is a new doc, upload it
                 mycouch.save(ws.obj)
-                proclog.info("saving {0}".format(ws.obj["name"]))
+                proclog.info(f"saving {ws.obj['name']}")
             else:
-                proclog.warn(
-                    "more than one row with name {0} found".format(ws.obj["name"])
-                )
+                proclog.warn(f"more than one row with name {ws.obj['name']} found")
             # signals to queue job is done
             queue.task_done()
 
@@ -178,17 +173,13 @@ def processWSULSQL(args, queue, logqueue):
         # grabs project from queue
         try:
             ws_id = queue.get(block=True, timeout=3)
-            proclog.info("Starting work on {}".format(ws_id))
+            proclog.info(f"Starting work on {ws_id}")
         except Queue.Empty:
             work = False
             proclog.info("exiting gracefully")
             break
         else:
-            step = (
-                session.query(gt.Process)
-                .filter(gt.Process.processid == int(ws_id))
-                .one()
-            )
+            step = session.query(gt.Process).filter(gt.Process.processid == int(ws_id)).one()
             ws = lclasses.Workset_SQL(session, proclog, step)
             doc = {}
             for row in db.view("worksets/lims_id")[ws.obj["id"]]:
@@ -201,14 +192,10 @@ def processWSULSQL(args, queue, logqueue):
             for row in db.view("worksets/name")[ws.obj["name"]]:
                 doc = db.get(row.id)
                 if doc["id"] != ws.obj["id"]:
-                    proclog.warning(
-                        "Duplicate name {} for worksets {} and {}".format(
-                            doc["name"], doc["id"], final_doc["id"]
-                        )
-                    )
+                    proclog.warning(f"Duplicate name {doc['name']} for worksets {doc['id']} and {final_doc['id']}")
                     db.delete(doc)
             db.save(final_doc)
-            proclog.info("updating {0}".format(ws.obj["name"]))
+            proclog.info(f"updating {ws.obj['name']}")
             queue.task_done()
 
 

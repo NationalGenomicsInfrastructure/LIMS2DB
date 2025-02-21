@@ -1,7 +1,10 @@
-pyyaml
-genologics_sql
-genologics
-six
+couchdb
+genologics @ git+https://github.com/SciLifeLab/genologics.git
+genologics_sql @ git+https://github.com/NationalGenomicsInfrastructure/genologics_sql.git
 markdown
-statusdb @ git+https://github.com/SciLifeLab/statusdb.git
-
+pyyaml
+requests
+setuptools
+six
+sqlalchemy
+statusdb @ git+https://github.com/NationalGenomicsInfrastructure/statusdb.git

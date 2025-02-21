@@ -1,19 +1,21 @@
 """Script to update projects from LIMS
 to corresponding orders in Order Portal."""
 
-from genologics.lims import Lims, Project
-from genologics.config import BASEURI, USERNAME, PASSWORD
-from genologics_sql import queries
-import genologics_sql.utils
-from datetime import date, timedelta
-import json
 import argparse
-import requests
+import json
 import os
+from datetime import date, timedelta
+
+import genologics_sql.utils
+import requests
+from genologics.config import BASEURI, PASSWORD, USERNAME
+from genologics.lims import Lims, Project
+from genologics_sql import queries
+
 import LIMS2DB.utils as lutils
 
 
-class Order_Portal_APIs(object):
+class Order_Portal_APIs:
     def __init__(self, url, headers, log):
         self.base_url = url
         self.headers = headers
@@ -27,7 +29,7 @@ class Order_Portal_APIs(object):
             pjs = self.lims.get_projects(open_date=open_date.strftime("%Y-%m-%d"))
         for project in pjs:
             try:
-                pname = project.name
+                project.name
             except requests.exceptions.HTTPError:  # project does not exist in LIMS
                 self.log.info(f"Project {project.id} not found in LIMS")
                 continue
@@ -53,13 +55,9 @@ class Order_Portal_APIs(object):
                     response.reason,
                 )
 
-                self.log.info(
-                    f"Updated internal id for order: {ORDER_ID} - {project.id}"
-                )
+                self.log.info(f"Updated internal id for order: {ORDER_ID} - {project.id}")
             else:
-                print(
-                    f"Dry run: {date.today()} Updated internal id for order: {ORDER_ID} - {project.id}"
-                )
+                print(f"Dry run: {date.today()} Updated internal id for order: {ORDER_ID} - {project.id}")
 
     def update_order_status(self, project_id, dry_run):
         lims_db = genologics_sql.utils.get_session()
@@ -81,9 +79,7 @@ class Order_Portal_APIs(object):
             data = ""
             try:
                 data = response.json()
-            except (
-                ValueError
-            ):  # In case a portal id does not exit on lims, skip the proj
+            except ValueError:  # In case a portal id does not exit on lims, skip the proj
                 continue
             url = ""
 
@@ -112,13 +108,9 @@ class Order_Portal_APIs(object):
                         response.status_code,
                         response.reason,
                     )
-                    self.log.info(
-                        f'Updated status for order {ORDER_ID} from {data["status"]} to {status_set}'
-                    )
+                    self.log.info(f"Updated status for order {ORDER_ID} from {data['status']} to {status_set}")
                 else:
-                    print(
-                        f'Dry run: {date.today()} Updated status for order {ORDER_ID} from {data["status"]} to {status_set}'
-                    )
+                    print(f"Dry run: {date.today()} Updated status for order {ORDER_ID} from {data['status']} to {status_set}")
 
 
 if __name__ == "__main__":
@@ -137,9 +129,7 @@ if __name__ == "__main__":
         "-l",
         "--log",
         dest="logfile",
-        default=os.path.join(
-            os.environ["HOME"], "log/LIMS2DB", "OrderPortal_update.log"
-        ),
+        default=os.path.join(os.environ["HOME"], "log/LIMS2DB", "OrderPortal_update.log"),
         help="log file.  Default: ~/log/LIMS2DB/OrderPortal_update.log",
     )
     parser.add_argument(
@@ -162,9 +152,7 @@ if __name__ == "__main__":
 
     with open(args.config) as config_file:
         creds = json.load(config_file)
-    OP_BASE_URL = creds["OrderPortal"].get(
-        "URL"
-    )  # Base URL for your OrderPortal instance.
+    OP_BASE_URL = creds["OrderPortal"].get("URL")  # Base URL for your OrderPortal instance.
     API_KEY = creds["OrderPortal"].get("API_KEY")  # API key for the user account.
     headers = {"X-OrderPortal-API-key": API_KEY}
     ord_port_apis = Order_Portal_APIs(OP_BASE_URL, headers, log)
@@ -172,6 +160,4 @@ if __name__ == "__main__":
     if args.option == "OrderStatus":
         ord_port_apis.update_order_status(args.project_id, args.dryrun)
     elif args.option == "OrderInternalID":
-        ord_port_apis.update_order_internal_id(
-            date.today() - timedelta(days=1), args.dryrun, args.project_id
-        )
+        ord_port_apis.update_order_internal_id(date.today() - timedelta(days=1), args.dryrun, args.project_id)

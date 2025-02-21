@@ -1,14 +1,8 @@
-import couchdb
-import logging
-import ast
-
-from genologics_sql.tables import *
-from genologics_sql.utils import *
 from genologics_sql.queries import get_last_modified_processes
+from genologics_sql.tables import Artifact, Container
+from sqlalchemy import text
 
 import LIMS2DB.objectsDB.process_categories as pc_cg
-
-from sqlalchemy import text
 
 
 def create_lims_data_obj(session, pro):
@@ -16,10 +10,10 @@ def create_lims_data_obj(session, pro):
     obj["step_id"] = pro.luid
 
     # which container is used in this step ?
-    query = "select distinct ct.* from container ct\
+    query = f"select distinct ct.* from container ct\
              inner join containerplacement cp on cp.containerid=ct.containerid \
              inner join processiotracker piot on piot.inputartifactid=cp.processartifactid \
-             where piot.processid = {pid}::integer;".format(pid=pro.processid)
+             where piot.processid = {pro.processid}::integer;"
 
     cont = session.query(Container).from_statement(text(query)).first()
     obj["container_id"] = cont.luid
@@ -36,17 +30,15 @@ def create_lims_data_obj(session, pro):
         "NovaSeqXPlus Run v1.0",
     ]:
         # NovaSeq flowcell have the individual stats as output artifact
-        query = "select art.* from artifact art \
+        query = f"select art.* from artifact art \
                  inner join outputmapping omap on omap.outputartifactid=art.artifactid \
                  inner join processiotracker piot on piot.trackerid=omap.trackerid \
-                 where art.name LIKE 'Lane%' and piot.processid = {pid}::integer;".format(
-            pid=pro.processid
-        )
+                 where art.name LIKE 'Lane%' and piot.processid = {pro.processid}::integer;"
     else:
         # Which artifacts are updated in this step ?
-        query = "select distinct art.* from artifact art\
+        query = f"select distinct art.* from artifact art\
                  inner join processiotracker piot on piot.inputartifactid=art.artifactid \
-                 where piot.processid = {pid}::integer;".format(pid=pro.processid)
+                 where piot.processid = {pro.processid}::integer;"
 
     obj["run_summary"] = {}
     arts = session.query(Artifact).from_statement(text(query)).all()
@@ -74,14 +66,13 @@ def get_sequencing_steps(session, interval="24 hours"):
 
 
 def upload_to_couch(couch, runid, lims_data, pro):
-
     if pc_cg.SEQUENCING.get(str(pro.typeid), "") in [
         "AUTOMATED - NovaSeq Run (NovaSeq 6000 v2.0)",
         "Illumina Sequencing (NextSeq) v1.0",
         "MiSeq Run (MiSeq) 4.0",
         "NovaSeqXPlus Run v1.0",
     ]:
-        dbname  = "x_flowcells"
+        dbname = "x_flowcells"
     elif pc_cg.SEQUENCING.get(str(pro.typeid), "") in ["AVITI Run v1.0"]:
         dbname = "element_runs"
 

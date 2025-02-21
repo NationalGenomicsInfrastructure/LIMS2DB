@@ -4,31 +4,27 @@
 Maya Brandi, Science for Life Laboratory, Stockholm, Sweden.
 """
 
-from __future__ import print_function
-from genologics.config import BASEURI, USERNAME, PASSWORD
-from genologics.lims import Lims
-from argparse import ArgumentParser
-from LIMS2DB.utils import formatStack
-from statusdb.db.utils import load_couch_server
-from genologics_sql.queries import get_last_modified_projectids
-from genologics_sql.utils import get_session, get_configuration
-from genologics_sql.tables import Project as DBProject
-from LIMS2DB.classes import ProjectSQL
-
-import yaml
 import json
 import logging
 import logging.handlers
 import multiprocessing as mp
 import os
-
-try:
-    import queue as Queue
-except ImportError:
-    import Queue
+import queue as Queue
 import sys
 import time
 import traceback
+from argparse import ArgumentParser
+
+import yaml
+from genologics.config import BASEURI, PASSWORD, USERNAME
+from genologics.lims import Lims
+from genologics_sql.queries import get_last_modified_projectids
+from genologics_sql.tables import Project as DBProject
+from genologics_sql.utils import get_configuration, get_session
+from statusdb.db.utils import load_couch_server
+
+from LIMS2DB.classes import ProjectSQL
+from LIMS2DB.utils import formatStack
 
 
 def main(options):
@@ -40,9 +36,7 @@ def main(options):
 
     mainlog = logging.getLogger("psullogger")
     mainlog.setLevel(level=logging.INFO)
-    mfh = logging.handlers.RotatingFileHandler(
-        options.logfile, maxBytes=209715200, backupCount=5
-    )
+    mfh = logging.handlers.RotatingFileHandler(options.logfile, maxBytes=209715200, backupCount=5)
     mft = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     mfh.setFormatter(mft)
     mainlog.addHandler(mfh)
@@ -50,21 +44,14 @@ def main(options):
     # try getting orderportal config
     oconf = None
     try:
-        with open(options.oconf, "r") as ocf:
+        with open(options.oconf) as ocf:
             oconf = yaml.load(ocf, Loader=yaml.SafeLoader)["order_portal"]
     except Exception as e:
-        mainlog.warn(
-            "Loading orderportal config {} failed due to {}, so order information "
-            "for project will not be updated".format(options.oconf, e)
-        )
+        mainlog.warn(f"Loading orderportal config {options.oconf} failed due to {e}, so order information for project will not be updated")
 
     if options.project_name:
         host = get_configuration()["url"]
-        pj_id = (
-            lims_db.query(DBProject.luid)
-            .filter(DBProject.name == options.project_name)
-            .scalar()
-        )
+        pj_id = lims_db.query(DBProject.luid).filter(DBProject.name == options.project_name).scalar()
         if not pj_id:
             pj_id = options.project_name
         P = ProjectSQL(lims_db, mainlog, pj_id, host, couch, oconf)
@@ -88,24 +75,18 @@ def create_projects_list(options, db_session, lims, log):
     projects = []
     if options.all_projects:
         if options.hours:
-            postgres_string = "{} hours".format(options.hours)
+            postgres_string = f"{options.hours} hours"
             project_ids = get_last_modified_projectids(db_session, postgres_string)
-            valid_projects = (
-                db_session.query(DBProject)
-                .filter(DBProject.luid.in_(project_ids))
-                .all()
-            )
-            log.info(
-                "project list : {0}".format(" ".join([p.luid for p in valid_projects]))
-            )
+            valid_projects = db_session.query(DBProject).filter(DBProject.luid.in_(project_ids)).all()
+            log.info(f"project list : {' '.join([p.luid for p in valid_projects])}")
             return valid_projects
         else:
             projects = db_session.query(DBProject).all()
-            log.info("project list : {0}".format(" ".join([p.luid for p in projects])))
+            log.info(f"project list : {' '.join([p.luid for p in projects])}")
             return projects
 
     elif options.input:
-        with open(options.input, "r") as input_file:
+        with open(options.input) as input_file:
             for pname in input_file:
                 try:
                     projects.append(lims.get_projects(name=pname.rstrip())[0])
@@ -136,10 +117,8 @@ def processPSUL(options, queue, logqueue, oconf=None):
         # grabs project from queue
         try:
             projname = queue.get(block=True, timeout=3)
-            proclog.info("Starting work on {} ".format(projname))
-            proclog.info(
-                "Approximately {} projects left in queue".format(queue.qsize())
-            )
+            proclog.info(f"Starting work on {projname} ")
+            proclog.info(f"Approximately {queue.qsize()} projects left in queue")
         except Queue.Empty:
             work = False
             proclog.info("exiting gracefully")
@@ -154,29 +133,23 @@ def processPSUL(options, queue, logqueue, oconf=None):
                 try:
                     open(lockfile, "w").close()
                 except:
-                    proclog.error("cannot create lockfile {}".format(lockfile))
+                    proclog.error(f"cannot create lockfile {lockfile}")
                 try:
-                    pj_id = (
-                        db_session.query(DBProject.luid)
-                        .filter(DBProject.name == projname)
-                        .scalar()
-                    )
+                    pj_id = db_session.query(DBProject.luid).filter(DBProject.name == projname).scalar()
                     host = get_configuration()["url"]
                     P = ProjectSQL(db_session, proclog, pj_id, host, couch, oconf)
                     P.save()
                 except:
                     error = sys.exc_info()
                     stack = traceback.extract_tb(error[2])
-                    proclog.error(
-                        "{0}:{1}\n{2}".format(error[0], error[1], formatStack(stack))
-                    )
+                    proclog.error(f"{error[0]}:{error[1]}\n{formatStack(stack)}")
 
                 try:
                     os.remove(lockfile)
                 except:
-                    proclog.error("cannot remove lockfile {}".format(lockfile))
+                    proclog.error(f"cannot remove lockfile {lockfile}")
             else:
-                proclog.info("project {} is locked, skipping.".format(projname))
+                proclog.info(f"project {projname} is locked, skipping.")
 
             # signals to queue job is done
             queue.task_done()
@@ -198,9 +171,7 @@ def masterProcess(options, projectList, mainlims, logger, oconf=None):
     logger.info("done ordering the project list")
     # spawn a pool of processes, and pass them queue instance
     for i in range(options.processes):
-        p = mp.Process(
-            target=processPSUL, args=(options, projectsQueue, logQueue, oconf)
-        )
+        p = mp.Process(target=processPSUL, args=(options, projectsQueue, logQueue, oconf))
         p.start()
         childs.append(p)
     # populate queue with data
@@ -310,9 +281,7 @@ if __name__ == "__main__":
         "--all_projects",
         action="store_true",
         default=False,
-        help=(
-            "Upload all Lims projects into couchDB." "Don't use together with -f flag."
-        ),
+        help=("Upload all Lims projects into couchDB.Don't use together with -f flag."),
     )
     parser.add_argument(
         "-c",
@@ -330,11 +299,7 @@ if __name__ == "__main__":
         dest="upload",
         default=True,
         action="store_false",
-        help=(
-            "Use this tag if project objects should not be uploaded,"
-            " but printed to output_f, or to stdout. Only works with"
-            " individual projects, not with -a."
-        ),
+        help=("Use this tag if project objects should not be uploaded, but printed to output_f, or to stdout. Only works with individual projects, not with -a."),
     )
     parser.add_argument(
         "--output_f",
@@ -358,10 +323,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lockdir",
         default=os.path.expanduser("~/psul_locks"),
-        help=(
-            "Directory for handling the lock files to avoid multiple updates "
-            "of one project. default is $HOME/psul_locks "
-        ),
+        help=("Directory for handling the lock files to avoid multiple updates of one project. default is $HOME/psul_locks "),
     )
     parser.add_argument(
         "-j",
@@ -379,10 +341,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no_new_modification_time",
         action="store_true",
-        help=(
-            "This updates documents without changing the modification time. "
-            "Slightly dangerous, but useful e.g. when all projects would be updated."
-        ),
+        help=("This updates documents without changing the modification time. Slightly dangerous, but useful e.g. when all projects would be updated."),
     )
 
     options = parser.parse_args()

@@ -1,9 +1,9 @@
 import logging
 import logging.handlers
-import traceback
-import couchdb
-from email.mime.text import MIMEText
 import smtplib
+from email.mime.text import MIMEText
+
+import couchdb
 
 
 # merges d2 in d1, keeps values from d1
@@ -27,9 +27,7 @@ def merge(d1, d2):
 def setupLog(name, logfile):
     mainlog = logging.getLogger(name)
     mainlog.setLevel(level=logging.INFO)
-    mfh = logging.handlers.RotatingFileHandler(
-        logfile, maxBytes=209715200, backupCount=5
-    )
+    mfh = logging.handlers.RotatingFileHandler(logfile, maxBytes=209715200, backupCount=5)
     mft = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     mfh.setFormatter(mft)
     mainlog.addHandler(mfh)
@@ -39,20 +37,14 @@ def setupLog(name, logfile):
 def formatStack(stack):
     formatted_error = []
     for trace in stack:
-        formatted_error.append(
-            "File {f}: line {l} in {i}\n{e}".format(
-                f=trace[0], l=trace[1], i=trace[2], e=trace[3]
-            )
-        )
+        formatted_error.append(f"File {trace[0]}: line {trace[1]} in {trace[2]}\n{trace[3]}")
 
     return "\n".join(formatted_error)
 
 
 def setupServer(conf):
     db_conf = conf["statusdb"]
-    url = "https://{0}:{1}@{2}".format(
-        db_conf["username"], db_conf["password"], db_conf["url"]
-    )
+    url = f"https://{db_conf['username']}:{db_conf['password']}@{db_conf['url']}"
     return couchdb.Server(url)
 
 

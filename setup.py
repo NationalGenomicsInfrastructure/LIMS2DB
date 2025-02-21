@@ -1,18 +1,17 @@
-from setuptools import setup, find_packages
 import glob
 import subprocess
 
+from setuptools import find_packages, setup
+
 
 def get_version():
-    return "1.0+{}".format(
-        subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode("utf-8")
-    )
+    return f"1.0+{subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')}"
 
 
 try:
-    with open("requirements.txt", "r") as f:
+    with open("requirements.txt") as f:
         install_requires = [x.strip() for x in f.readlines()]
-except IOError:
+except OSError:
     install_requires = []
 
 setup(

@@ -1,14 +1,12 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-from genologics.lims import *
-from genologics.config import BASEURI, USERNAME, PASSWORD
-from datetime import *
-from email.mime.text import MIMEText
-from statusdb.db.utils import load_couch_server
-
+import argparse
 import os
 import smtplib
-import argparse
+from datetime import date, timedelta
+from email.mime.text import MIMEText
+
+from genologics.config import BASEURI, PASSWORD, USERNAME
+from genologics.lims import Lims
+from statusdb.db.utils import load_couch_server
 
 
 def main(args):
@@ -85,70 +83,48 @@ def main(args):
                 date_start = None
                 # Special case for the project summary
                 if pr.type.name == "Project Summary 1.3":
-                    if "Queued" in pr.udf and pr.udf["Queued"] == yesterday.strftime(
-                        "%Y-%m-%d"
-                    ):
+                    if "Queued" in pr.udf and pr.udf["Queued"] == yesterday.strftime("%Y-%m-%d"):
                         completed.append(
                             {
                                 "project": p.name,
                                 "action": "has been queued",
                                 "date": pr.udf["Queued"],
                                 "techID": pr.udf["Signature Queued"],
-                                "tech": pr.technician.first_name
-                                + " "
-                                + pr.technician.last_name,
+                                "tech": pr.technician.first_name + " " + pr.technician.last_name,
                                 "sum": True,
                             }
                         )
-                    if "All samples sequenced" in pr.udf and pr.udf[
-                        "All samples sequenced"
-                    ] == yesterday.strftime("%Y-%m-%d"):
+                    if "All samples sequenced" in pr.udf and pr.udf["All samples sequenced"] == yesterday.strftime("%Y-%m-%d"):
                         completed.append(
                             {
                                 "project": p.name,
                                 "action": "Has all its samples sequenced",
                                 "date": pr.udf["All samples sequenced"],
                                 "techID": pr.udf["Signature All samples sequenced"],
-                                "tech": pr.technician.first_name
-                                + " "
-                                + pr.technician.last_name,
+                                "tech": pr.technician.first_name + " " + pr.technician.last_name,
                                 "sum": True,
                             }
                         )
-                    if " All raw data delivered" in pr.udf and pr.udf[
-                        " All raw data delivered"
-                    ] == yesterday.strftime("%Y-%m-%d"):
+                    if " All raw data delivered" in pr.udf and pr.udf[" All raw data delivered"] == yesterday.strftime("%Y-%m-%d"):
                         completed.append(
                             {
                                 "project": p.name,
                                 "action": "Has all its samples sequenced",
                                 "date": pr.udf[" All raw data delivered"],
                                 "techID": pr.udf["Signature  All raw data delivered"],
-                                "tech": pr.technician.first_name
-                                + " "
-                                + pr.technician.last_name,
+                                "tech": pr.technician.first_name + " " + pr.technician.last_name,
                                 "sum": True,
                             }
                         )
 
                 else:  # I don't want to combine this in a single elif because of the line 80, that must be done in the else, but regardless of the if
-                    if (
-                        "Run ID" in pr.udf
-                    ):  # this is true for sequencing processes, and gives the actual starting date
+                    if "Run ID" in pr.udf:  # this is true for sequencing processes, and gives the actual starting date
                         date_start = pr.udf["Run ID"].split("_")[0]  # format is YYMMDD
-                        date_start = (
-                            date_start[:2]
-                            + "-"
-                            + date_start[2:4]
-                            + "-"
-                            + date_start[4:6]
-                        )
+                        date_start = date_start[:2] + "-" + date_start[2:4] + "-" + date_start[4:6]
                         if pr.date_run and date_start == pr.date_run[4:]:
                             date_start = None
                         else:
-                            date_start = (
-                                "20" + date_start
-                            )  # now, the format is YYYY-MM-DD, assuming no prjects come from the 1990's or the next century...
+                            date_start = "20" + date_start  # now, the format is YYYY-MM-DD, assuming no prjects come from the 1990's or the next century...
                     completed.append(
                         {
                             "project": p.name,
@@ -156,9 +132,7 @@ def main(args):
                             "limsid": pr.id,
                             "start": date_start,
                             "end": pr.date_run,
-                            "tech": pr.technician.first_name
-                            + " "
-                            + pr.technician.last_name,
+                            "tech": pr.technician.first_name + " " + pr.technician.last_name,
                             "sum": False,
                         }
                     )
@@ -196,19 +170,14 @@ def main(args):
             for struct in summary[resp]:
                 if resp != struct.get("tech") and not struct["sum"]:
                     plist.add(struct["project"])
-                    body += "In project {},  {} ({})".format(
-                        struct["project"], struct["process"], struct["limsid"]
-                    )
-                    if (
-                        struct["start"]
-                        and yesterday.strftime("%Y-%m-%d") == struct["start"]
-                    ):
-                        body += "started on {}, ".format(struct["start"])
+                    body += f"In project {struct['project']},  {struct['process']} ({struct['limsid']})"
+                    if struct["start"] and yesterday.strftime("%Y-%m-%d") == struct["start"]:
+                        body += f"started on {struct['start']}, "
                     elif struct["end"]:
-                        body += "ended on {}, ".format(struct["end"])
+                        body += f"ended on {struct['end']}, "
                     else:
                         body += "has been updated yesterday, "
-                    body += "Done by {}\n".format(struct["tech"])
+                    body += f"Done by {struct['tech']}\n"
                 elif struct["sum"]:
                     plist.add(struct["project"])
                     body += "Project {} {} on {} by {}\n".format(
@@ -218,21 +187,17 @@ def main(args):
                         struct["techID"],
                     )
             if body != "":
-                control += "{} : {}\n".format(resp_email, body)
-                body += '\n\n--\nThis mail is an automated mail that is generated once a day and summarizes the events of the previous days in the lims, \
-for the projects you are described as "Lab responsible", "Bioinfo Responsible" or "Project coordinator". You can send comments or suggestions to {}'.format(
-                    operator
-                )
+                control += f"{resp_email} : {body}\n"
+                body += f'\n\n--\nThis mail is an automated mail that is generated once a day and summarizes the events of the previous days in the lims, \
+for the projects you are described as "Lab responsible", "Bioinfo Responsible" or "Project coordinator". You can send comments or suggestions to {operator}'
                 msg = MIMEText(body)
-                msg["Subject"] = "[Lims update] {}".format(" ".join(plist))
+                msg["Subject"] = f"[Lims update] {' '.join(plist)}"
                 msg["From"] = "Lims_monitor"
                 try:
                     msg["To"] = resp_email
                 except KeyError:
                     msg["To"] = operator
-                    msg["Subject"] = "[Lims update] Failed to send a mail to {}".format(
-                        resp
-                    )
+                    msg["Subject"] = f"[Lims update] Failed to send a mail to {resp}"
 
                 s = smtplib.SMTP("localhost")
                 s.sendmail("genologics-lims@scilifelab.se", msg["To"], msg.as_string())
@@ -248,9 +213,7 @@ for the projects you are described as "Lab responsible", "Bioinfo Responsible" o
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="mail the modifications in the lims for the last day to the responsibles declared in project summary"
-    )
+    parser = argparse.ArgumentParser(description="mail the modifications in the lims for the last day to the responsibles declared in project summary")
     parser.add_argument(
         "-c",
         "--conf",
