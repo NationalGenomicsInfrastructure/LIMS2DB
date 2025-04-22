@@ -950,13 +950,11 @@ class ProjectSQL:
                         try:
                             inp_artifact = self.session.query(Artifact).from_statement(text(query)).first()
 
-                            # Only skip the TruSeq small RNA protocol because we want the QC results of individual sample, not library pool
-                            # For other protocols sample QC results should just copy the one of library pool
+                            # We want the QC results of individual sample, not library pool
                             if (
                                 len(inp_artifact.samples) > 1
                                 and "by user" not in self.obj["details"]["library_construction_method"].lower()
                                 and "in-house" not in self.obj["details"]["library_construction_method"].lower()
-                                and "TruSeq small RNA" in self.obj["details"]["library_construction_method"]
                             ):
                                 continue
                             else:

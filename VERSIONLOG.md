@@ -1,5 +1,9 @@
 # LIMS2DB Version Log
 
+## 20250422.1
+
+Skip over QC results of all pools for Library validation QC, not just TruSeq small RNA
+
 ## 20241025.1
 
 Send emails on contract update for RNA-seq (single cell) projects.
