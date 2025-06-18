@@ -938,30 +938,40 @@ class ProjectSQL:
                         "daterun desc",
                     )
                     agrlibval = None
-                    for agrlv in agrlibvals:
-                        # for small rna (and maybe others), there is more than one agrlibval, and I should not get the latest one,
-                        # but the latest one that ran at sample level, not a pool level.
-                        # get input artifact of a given process that belongs to sample
-                        query = f"select art.* from artifact art \
-                            inner join artifact_sample_map asm on  art.artifactid=asm.artifactid \
-                            inner join processiotracker piot on piot.inputartifactid=art.artifactid \
-                            inner join sample sa on sa.processid=asm.processid \
-                            where sa.processid = {sample.processid} and piot.processid = {agrlv.processid}"
+                    # get input artifact of a given process that belongs to sample, add appropriate processid
+                    query = f"select art.* from artifact art \
+                        inner join artifact_sample_map asm on  art.artifactid=asm.artifactid \
+                        inner join processiotracker piot on piot.inputartifactid=art.artifactid \
+                        inner join sample sa on sa.processid=asm.processid \
+                        where sa.processid = {sample.processid} and piot.processid = "
+                    # If only Aggregate QC step exists, use it even if it's a pool
+                    if len(agrlibvals) == 1:
+                        agrlibval = agrlibvals[0]
+                        query += f"{agrlibval.processid}"
                         try:
                             inp_artifact = self.session.query(Artifact).from_statement(text(query)).first()
-
-                            # We want the QC results of individual sample, not library pool
-                            if (
-                                len(inp_artifact.samples) > 1
-                                and "by user" not in self.obj["details"]["library_construction_method"].lower()
-                                and "in-house" not in self.obj["details"]["library_construction_method"].lower()
-                            ):
-                                continue
-                            else:
-                                agrlibval = agrlv
-                                break
                         except NoResultFound:
                             pass
+                    else:
+                        for agrlv in agrlibvals:
+                            # for small rna (and maybe others), there is more than one agrlibval, and I should not get the latest one,
+                            # but the latest one that ran at sample level, not a pool level.
+                            query += f"{agrlv.processid}"
+                            try:
+                                inp_artifact = self.session.query(Artifact).from_statement(text(query)).first()
+
+                                # We want the QC results of individual sample, not library pool
+                                if (
+                                    len(inp_artifact.samples) > 1
+                                    and "by user" not in self.obj["details"]["library_construction_method"].lower()
+                                    and "in-house" not in self.obj["details"]["library_construction_method"].lower()
+                                ):
+                                    continue
+                                else:
+                                    agrlibval = agrlv
+                                    break
+                            except NoResultFound:
+                                pass
 
                     # try and get seqruns for this library, this should work for most of the cases
                     # but not entirely sure if it would work for edgy cases
