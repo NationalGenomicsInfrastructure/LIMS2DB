@@ -87,6 +87,7 @@ PREPSTART = {
     "2705": "Illumina DNA PCR-free Library Construction",
     "2808": "Lysis, RT and pre-Amp",
     "3106": "Illumina DNA No-QC Library Construction",
+    "2458": "ONT End-Prep v2.0",
 }
 PREPEND = {
     "109": "CA Purification",
