@@ -1046,7 +1046,7 @@ class ProjectSQL:
                                 inner join artifact_sample_map asm on  art.artifactid=asm.artifactid \
                                 inner join processiotracker piot on piot.inputartifactid=art.artifactid \
                                 inner join sample sa on sa.processid=asm.processid \
-                                where sa.processid = {sample.processid} and piot.processid = {agrlv.processid}"
+                                where sa.processid = {sample.processid} and piot.processid = {agrlibval.processid}"
                             inp_artifact = self.session.query(Artifact).from_statement(text(query)).first()
 
                         self.obj["samples"][sample.name]["library_prep"][prepname]["library_validation"][agrlibval.luid].update(self.make_normalized_dict(inp_artifact.udf_dict))
