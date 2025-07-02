@@ -948,7 +948,7 @@ class ProjectSQL:
                     if len(agrlibvals) == 1:
                         agrlibval = agrlibvals[0]
                         try:
-                            inp_artifact = self.session.query(Artifact).from_statement(text(query+f"{agrlibval.processid}")).first()
+                            inp_artifact = self.session.query(Artifact).from_statement(text(query + f"{agrlibval.processid}")).first()
                         except NoResultFound:
                             pass
                     else:
@@ -956,7 +956,7 @@ class ProjectSQL:
                             # for small rna (and maybe others), there is more than one agrlibval, and I should not get the latest one,
                             # but the latest one that ran at sample level, not a pool level.
                             try:
-                                inp_artifact = self.session.query(Artifact).from_statement(text(query+f"{agrlv.processid}")).first()
+                                inp_artifact = self.session.query(Artifact).from_statement(text(query + f"{agrlv.processid}")).first()
 
                                 # We want the QC results of individual sample, not library pool
                                 if (
