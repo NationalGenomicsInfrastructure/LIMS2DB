@@ -947,18 +947,16 @@ class ProjectSQL:
                     # If only Aggregate QC step exists, use it even if it's a pool
                     if len(agrlibvals) == 1:
                         agrlibval = agrlibvals[0]
-                        query += f"{agrlibval.processid}"
                         try:
-                            inp_artifact = self.session.query(Artifact).from_statement(text(query)).first()
+                            inp_artifact = self.session.query(Artifact).from_statement(text(query+f"{agrlibval.processid}")).first()
                         except NoResultFound:
                             pass
                     else:
                         for agrlv in agrlibvals:
                             # for small rna (and maybe others), there is more than one agrlibval, and I should not get the latest one,
                             # but the latest one that ran at sample level, not a pool level.
-                            query += f"{agrlv.processid}"
                             try:
-                                inp_artifact = self.session.query(Artifact).from_statement(text(query)).first()
+                                inp_artifact = self.session.query(Artifact).from_statement(text(query+f"{agrlv.processid}")).first()
 
                                 # We want the QC results of individual sample, not library pool
                                 if (
