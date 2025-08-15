@@ -1,5 +1,4 @@
 import copy
-import http.client as http_client
 import re
 from datetime import datetime
 
@@ -14,6 +13,7 @@ from genologics_sql.tables import (
     ReagentType,
     Researcher,
 )
+from ibm_cloud_sdk_core.api_exception import ApiException
 from requests import get as rget
 from sqlalchemy import text
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
@@ -452,14 +452,19 @@ class ProjectSQL:
         doc = None
         # When running for a single project, sometimes the connection is lost so retry
         try:
-            self.couch["projects"]
-        except http_client.BadStatusLine:
+            self.couch.get_server_information().get_result()
+        except ApiException:
             self.log.warning(f"Access to couch failed before trying to save new doc for project {self.pid}")
             pass
-        db = self.couch["projects"]
-        view = db.view("project/project_id")
-        for row in view[self.pid]:
-            doc = db.get(row.id)
+        result = self.couch.post_view(
+            db="projects",
+            ddoc="project",
+            view="project_id",
+            key=self.pid,
+            include_docs=True,
+        ).get_result()["rows"]
+        if result:
+            doc = result[0]["doc"]
         if doc:
             fields_saved = [
                 "_id",
@@ -502,7 +507,11 @@ class ProjectSQL:
                     self.obj["order_details"] = doc["order_details"]
 
                 self.log.info(f"Trying to save new doc for project {self.pid}")
-                db.save(self.obj)
+                self.couch.put_document(
+                    db="projects",
+                    doc_id=self.obj["_id"],
+                    document=self.obj,
+                ).get_result()
                 if self.obj.get("details", {}).get("type", "") == "Application":
                     lib_method_text = f"Library method: {self.obj['details'].get('library_construction_method', 'N/A')}"
                     application = self.obj.get("details", {}).get("application", "")
@@ -537,7 +546,10 @@ class ProjectSQL:
             self.obj["creation_time"] = datetime.now().isoformat()
             self.obj["modification_time"] = self.obj["creation_time"]
             self.log.info(f"Trying to save new doc for project {self.pid}")
-            db.save(self.obj)
+            self.couch.post_document(
+                db="projects",
+                document=self.obj,
+            ).get_result()
             if self.obj.get("details", {}).get("type", "") == "Application":
                 genstat_url = f"{self.genstat_proj_url}{self.obj['project_id']}"
                 lib_method_text = f"Library method: {self.obj['details'].get('library_construction_method', 'N/A')}"

@@ -3,7 +3,7 @@ import logging.handlers
 import smtplib
 from email.mime.text import MIMEText
 
-import couchdb
+from ibmcloudant import CouchDbSessionAuthenticator, cloudant_v1
 
 
 # merges d2 in d1, keeps values from d1
@@ -42,10 +42,18 @@ def formatStack(stack):
     return "\n".join(formatted_error)
 
 
-def setupServer(conf):
+def load_couch_server(conf):
+    """Loads the CouchDB server instance from the configuration.
+    :param dict conf: Configuration dictionary containing statusdb settings
+    :return: CouchDB server instance
+    """
     db_conf = conf["statusdb"]
-    url = f"https://{db_conf['username']}:{db_conf['password']}@{db_conf['url']}"
-    return couchdb.Server(url)
+    couchdb = cloudant_v1.CloudantV1(authenticator=CouchDbSessionAuthenticator(db_conf["username"], db_conf["password"]))
+    url = db_conf["url"]
+    if not url.startswith("https://"):
+        url = f"https://{url}"
+    couchdb.set_service_url(url)
+    return couchdb
 
 
 def send_mail(subject, content, receiver):

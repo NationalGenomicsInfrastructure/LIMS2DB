@@ -76,11 +76,10 @@ def upload_to_couch(couch, runid, lims_data, pro):
     elif pc_cg.SEQUENCING.get(str(pro.typeid), "") in ["AVITI Run v1.0"]:
         dbname = "element_runs"
 
-    db = couch[dbname]
-    view = db.view("info/id")
     doc = None
-    for row in view[runid]:
-        doc = db.get(row.value)
+    result = couch.post_view(db=dbname, ddoc="info", view="id", key=runid, include_docs=True).get_result()["rows"]
+    if result:
+        doc = result[0]["doc"]
 
     if doc:
         running_notes = {}
@@ -89,4 +88,7 @@ def upload_to_couch(couch, runid, lims_data, pro):
         doc["lims_data"] = lims_data
         if running_notes:
             doc["lims_data"]["container_running_notes"] = running_notes
-        db.save(doc)
+        couch.post_document(
+            db=dbname,
+            document=doc,
+        ).get_result()

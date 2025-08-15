@@ -4,9 +4,9 @@ import os
 import random
 
 import yaml
-from statusdb.db.utils import load_couch_server
 
 import LIMS2DB.diff as df
+from LIMS2DB.utils import load_couch_server
 
 
 def write_results_to_file(diffs, args):
@@ -20,33 +20,41 @@ def write_results_to_file(diffs, args):
 
 def main(args):
     couch = load_couch_server(args.conf)
-    proj_db = couch["projects"]
 
     with open(args.oconf) as ocf:
         oconf = yaml.load(ocf, Loader=yaml.SafeLoader)["order_portal"]
 
     diffs = {}
     if args.pj_id:
-        diffs[args.pj_id] = df.diff_project_objects(args.pj_id, couch, proj_db, args.log, oconf)
+        diffs[args.pj_id] = df.diff_project_objects(args.pj_id, couch, args.log, oconf)
 
     elif args.random:
         random.seed()
         closed_ids = []
-        proj_db = couch["projects"]
-        view = proj_db.view("project/summary")
-        for row in view[["closed", ""] : ["closed", "ZZZZZZZZ"]]:
-            if row.value.get("open_date", "0") > "2014-06-01":
-                closed_ids.append(row.key[1])
+        rows = couch.post_view(
+            db="projects",
+            ddoc="project",
+            view="summary",
+            startkey=["closed", ""],
+            endkey=["closed", "ZZZZZZZZ"],
+        ).get_result()["rows"]
+        for row in rows:
+            if row["value"].get("open_date", "0") > "2014-06-01":
+                closed_ids.append(row["key"][1])
         nb = int(len(closed_ids) / 10)
         picked_ids = random.sample(closed_ids, nb)
         for one_id in picked_ids:
-            diffs[one_id] = df.diff_project_objects(one_id, couch, proj_db, args.log, oconf)
+            diffs[one_id] = df.diff_project_objects(one_id, couch, args.log, oconf)
     else:
-        view = proj_db.view("project/project_id")
+        view = couch.post_view(
+            db="projects",
+            ddoc="project",
+            view="project_id",
+        ).get_result()["rows"]
         for row in view:
-            proj_diff = df.diff_project_objects(row.key, couch, proj_db, args.log, oconf)
+            proj_diff = df.diff_project_objects(row["key"], couch, args.log, oconf)
             if proj_diff is not None:
-                diffs[row.key] = proj_diff
+                diffs[row["key"]] = proj_diff
 
     write_results_to_file(diffs, args)
 

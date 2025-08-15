@@ -9,7 +9,7 @@ conda create -n lims2db_dev python=2.7
 conda activate lims2db_dev
 ```
 
-LIMS2DB is highly dependent on the [statusdb](https://github.com/SciLifeLab/statusdb), [genologics](https://github.com/scilifelab/genologics), [genologics_sql](https://github.com/scilifelab/genologics_sql) packages. The two latter are available on pypi and can be installed with pip. However, it might still be a good idea to install all three of these manually to be sure you get the latest version:
+LIMS2DB is highly dependent on the [genologics](https://github.com/scilifelab/genologics) and [genologics_sql](https://github.com/scilifelab/genologics_sql) packages. The two are available on pypi and can be installed with pip. However, it might still be a good idea to install all of these manually to be sure you get the latest version:
 
 ```
 git clone repo

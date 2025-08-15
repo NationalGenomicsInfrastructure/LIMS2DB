@@ -21,14 +21,10 @@ sys.path.insert(0, os.path.abspath("../"))
 
 
 MOCK_MODULES = [
-    "couchdb",
     "genologics",
     "genologics.lims",
     "genologics.entities",
     "genologics.lims_utils",
-    "statusdb",
-    "statusdb.db",
-    "statusdb.db.utils",
 ]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()

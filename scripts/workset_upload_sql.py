@@ -20,15 +20,18 @@ def main(args):
         ws = lclasses.Workset_SQL(session, log, step)
         with open(args.conf) as conf_file:
             conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
-        couch = lutils.setupServer(conf)
-        db = couch["worksets"]
+        couch = lutils.load_couch_server(conf)
         doc = {}
-        for row in db.view("worksets/lims_id")[ws.obj["id"]]:
-            doc = db.get(row.id)
+        result = couch.post_view(db="worksets", ddoc="worksets", view="lims_id", key=ws.obj["id"], include_docs=True).get_result()["rows"]
+        if result:
+            doc = result[0]["doc"]
 
         final_doc = lutils.merge(ws.obj, doc)
 
-        db.save(final_doc)
+        couch.post_document(
+            db="worksets",
+            document=final_doc,
+        ).get_result()
 
     elif args.recent:
         recent_processes = get_last_modified_processes(

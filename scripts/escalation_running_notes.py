@@ -15,15 +15,14 @@ import markdown
 from genologics_sql.utils import get_session
 from sqlalchemy import text
 from sqlalchemy.orm import aliased
-from statusdb.db.utils import load_couch_server
 
-from LIMS2DB.utils import send_mail
+from LIMS2DB.utils import load_couch_server, send_mail
 
 
 def main(args):
     session = get_session()
     couch = load_couch_server(args.conf)
-    db = couch["running_notes"]
+    db = "running_notes"
 
     def get_researcher(userid):
         query = "select rs.* from principals pr \
@@ -72,7 +71,7 @@ def main(args):
 
     def update_note_db(note):
         updated = False
-        note_existing = db.get(note["_id"])
+        note_existing = couch.get_document(db=db, doc_id=note["_id"]).get_result()
         if "_rev" in note.keys():
             del note["_rev"]
 
@@ -82,10 +81,10 @@ def main(args):
                 del dict_note["_rev"]
             if not dict_note == note:
                 note_existing.update(note)
-                db.save(note_existing)
+                couch.put_document(db=db, doc_id=note_existing["_id"], document=note_existing).get_result()
                 updated = True
         else:
-            db.save(note)
+            couch.post_document(db=db, document=note).get_result()
             updated = True
 
         return updated

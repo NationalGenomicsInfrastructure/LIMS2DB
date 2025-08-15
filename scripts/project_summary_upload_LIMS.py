@@ -21,10 +21,9 @@ from genologics.lims import Lims
 from genologics_sql.queries import get_last_modified_projectids
 from genologics_sql.tables import Project as DBProject
 from genologics_sql.utils import get_configuration, get_session
-from statusdb.db.utils import load_couch_server
 
 from LIMS2DB.classes import ProjectSQL
-from LIMS2DB.utils import formatStack
+from LIMS2DB.utils import formatStack, load_couch_server
 
 
 def main(options):
@@ -47,7 +46,7 @@ def main(options):
         with open(options.oconf) as ocf:
             oconf = yaml.load(ocf, Loader=yaml.SafeLoader)["order_portal"]
     except Exception as e:
-        mainlog.warn(f"Loading orderportal config {options.oconf} failed due to {e}, so order information for project will not be updated")
+        mainlog.warning(f"Loading orderportal config {options.oconf} failed due to {e}, so order information for project will not be updated")
 
     if options.project_name:
         host = get_configuration()["url"]

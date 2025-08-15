@@ -17,12 +17,16 @@ def main(args):
     lims = Lims(BASEURI, USERNAME, PASSWORD)
     with open(args.conf) as conf_file:
         conf = yaml.safe_load(conf_file)
-    bioinfodb = lutils.setupServer(conf)["bioinfo_analysis"]
-    open_projects = bioinfodb.view("latest_data/sample_id_open")
+    couch = lutils.load_couch_server(conf)
+    open_projects = couch.post_view(
+        db="bioinfo_analysis",
+        ddoc="latest_data",
+        view="sample_id_open",
+    ).get_result()["rows"]
 
-    for row in open_projects.rows:
-        project_id = row.key[0]
-        sample_id = row.key[3]
+    for row in open_projects:
+        project_id = row["key"][0]
+        sample_id = row["key"][3]
         close_date = None
         try:
             close_date = Project(lims=lims, id=project_id).close_date
@@ -32,12 +36,19 @@ def main(args):
                 continue
         if close_date is not None:
             try:
-                doc = bioinfodb.get(row.id)
+                doc = couch.get_document(
+                    db="bioinfo_analysis",
+                    document_id=row["id"],
+                ).get_result()
             except Exception as e:
                 log.error(e + "in Project " + project_id + " Sample " + sample_id + " while accessing doc from statusdb")
             doc["project_closed"] = True
             try:
-                bioinfodb.save(doc)
+                couch.put_document(
+                    db="bioinfo_analysis",
+                    document=doc,
+                    document_id=row["id"],
+                ).get_result()
                 log.info("Updated Project " + project_id + " Sample " + sample_id)
             except Exception as e:
                 log.error(e + "in Project " + project_id + " Sample " + sample_id + " while saving to statusdb")

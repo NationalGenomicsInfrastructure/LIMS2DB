@@ -1,5 +1,9 @@
 # LIMS2DB Version Log
 
+## 20250815.1
+
+Replace couchdb calls with cloudant; remove statusdb package dependency
+
 ## 20250422.1
 
 Skip over QC results of all pools for Library validation QC, not just TruSeq small RNA

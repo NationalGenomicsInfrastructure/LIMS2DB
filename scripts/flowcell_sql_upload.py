@@ -22,7 +22,7 @@ from LIMS2DB.flowcell_sql import (
     get_sequencing_steps,
     upload_to_couch,
 )
-from LIMS2DB.utils import setupServer
+from LIMS2DB.utils import load_couch_server
 
 
 def main(args):
@@ -41,7 +41,7 @@ def main(args):
     with open(args.conf) as conf_file:
         conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
 
-    couch = setupServer(conf)
+    couch = load_couch_server(conf)
     interval = f"{args.hours} hours"
 
     # list the right sequencing steps

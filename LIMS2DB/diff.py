@@ -1,37 +1,38 @@
-import http.client as http_client
-
 from genologics_sql.utils import get_configuration, get_session
+from ibm_cloud_sdk_core.api_exception import ApiException
 
 from LIMS2DB.utils import setupLog
 
 
-def diff_project_objects(pj_id, couch, proj_db, logfile, oconf):
+def diff_project_objects(pj_id, couch, logfile, oconf):
     # Import is put here to defer circular imports
     from LIMS2DB.classes import ProjectSQL
 
     log = setupLog(f"diff - {pj_id}", logfile)
 
-    view = proj_db.view("projects/lims_followed")
-
     def fetch_project(pj_id):
-        try:
-            old_project_couchid = view[pj_id].rows[0].value
-        except (KeyError, IndexError):
-            log.error(f"No such project {pj_id}")
+        result = couch.post_view(
+            db="projects",
+            ddoc="projects",
+            view="lims_followed",
+            key=pj_id,
+            include_docs=True,
+        ).get_result()["rows"]
+        if not result:
+            log.error(f"No project found in couch for {pj_id}")
             return None
-        return old_project_couchid
+        return result[0]["doc"]
 
     try:
-        old_project_couchid = fetch_project(pj_id)
-    except http_client.BadStatusLine:
-        log.error("BadStatusLine received after large project")
+        old_project = fetch_project(pj_id)
+    except ApiException:
+        log.error("Connection issues after large project")
         # Retry
-        old_project_couchid = fetch_project(pj_id)
+        old_project = fetch_project(pj_id)
 
-    if old_project_couchid is None:
+    if old_project is None:
         return None
 
-    old_project = proj_db.get(old_project_couchid)
     old_project.pop("_id", None)
     old_project.pop("_rev", None)
     old_project.pop("modification_time", None)

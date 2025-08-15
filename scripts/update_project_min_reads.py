@@ -8,7 +8,7 @@ from genologics.lims import Lims
 from genologics_sql.queries import get_last_modified_projectids
 from genologics_sql.utils import get_session
 
-from LIMS2DB.utils import setupServer
+from LIMS2DB.utils import load_couch_server
 
 
 def main(args):
@@ -16,15 +16,15 @@ def main(args):
     lims = Lims(BASEURI, USERNAME, PASSWORD)
     with open(args.conf) as cf:
         db_conf = yaml.load(cf, Loader=yaml.SafeLoader)
-        couch = setupServer(db_conf)
-    db = couch["expected_yields"]
+        couch = load_couch_server(db_conf)
     postgres_string = f"{args.hours} hours"
     project_ids = get_last_modified_projectids(lims_db, postgres_string)
 
     min_yields = {}
-    for row in db.view("yields/min_yield"):
-        db_key = " ".join(x if x else "" for x in row.key).strip()
-        min_yields[db_key] = row.value
+    rows = couch.post_view(db="expected_yields", ddoc="yields", view="min_yield").get_result()["rows"]
+    for row in rows:
+        db_key = " ".join(x if x else "" for x in row["key"]).strip()
+        min_yields[db_key] = row["value"]
 
     for project in [Project(lims, id=x) for x in project_ids]:
         samples_count = 0
