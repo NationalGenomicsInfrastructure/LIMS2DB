@@ -1,4 +1,3 @@
- couchdb
 genologics @ git+https://github.com/SciLifeLab/genologics.git
 genologics_sql @ git+https://github.com/NationalGenomicsInfrastructure/genologics_sql.git
 ibmcloudant
