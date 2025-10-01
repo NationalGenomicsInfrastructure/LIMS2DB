@@ -32,26 +32,26 @@ def main(args):
             close_date = Project(lims=lims, id=project_id).close_date
         except HTTPError as e:
             if "404: Project not found" in str(e):
-                log.error("Project " + project_id + " not found in LIMS")
+                log.error(f"Project {project_id} not found in LIMS")
                 continue
         if close_date is not None:
             try:
                 doc = couch.get_document(
                     db="bioinfo_analysis",
-                    document_id=row["id"],
+                    doc_id=row["id"],
                 ).get_result()
             except Exception as e:
-                log.error(e + "in Project " + project_id + " Sample " + sample_id + " while accessing doc from statusdb")
+                log.error(f"{e} in Project {project_id} Sample {sample_id} while accessing doc from statusdb")
             doc["project_closed"] = True
             try:
                 couch.put_document(
                     db="bioinfo_analysis",
                     document=doc,
-                    document_id=row["id"],
+                    doc_id=row["id"],
                 ).get_result()
-                log.info("Updated Project " + project_id + " Sample " + sample_id)
+                log.info(f"Updated Project {project_id} Sample {sample_id}")
             except Exception as e:
-                log.error(e + "in Project " + project_id + " Sample " + sample_id + " while saving to statusdb")
+                log.error(f"{e} in Project {project_id} Sample {sample_id} while saving to statusdb")
 
 
 if __name__ == "__main__":
