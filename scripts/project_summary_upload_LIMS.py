@@ -29,7 +29,9 @@ from LIMS2DB.utils import QueueHandler, formatStack, load_couch_server, stillRun
 def main(options):
     conf = options.conf
     output_f = options.output_f
-    couch = load_couch_server(conf)
+    with open(conf) as conf_file:
+        couch_conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
+    couch = load_couch_server(couch_conf)
     mainlims = Lims(BASEURI, USERNAME, PASSWORD)
     lims_db = get_session()
 
@@ -96,7 +98,9 @@ def create_projects_list(options, db_session, lims, log):
 
 
 def processPSUL(options, queue, logqueue, oconf=None):
-    couch = load_couch_server(options.conf)
+    with open(options.conf) as conf_file:
+        couch_conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
+    couch = load_couch_server(couch_conf)
     db_session = get_session()
     work = True
     procName = mp.current_process().name

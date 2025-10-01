@@ -4,6 +4,7 @@ import smtplib
 from datetime import date, timedelta
 from email.mime.text import MIMEText
 
+import yaml
 from genologics.config import BASEURI, PASSWORD, USERNAME
 from genologics.lims import Lims
 
@@ -16,7 +17,9 @@ def main(args):
     sixMonthsAgo = date.today() - timedelta(weeks=26)
     yesterday = date.today() - timedelta(days=1)
     pjs = lims.get_projects(open_date=sixMonthsAgo.strftime("%Y-%m-%d"))
-    statusdb = load_couch_server(args.conf)
+    with open(args.conf) as conf_file:
+        conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
+    statusdb = load_couch_server(conf)
 
     operator = "par.lundin@scilifelab.se"
     summary = {}

@@ -19,7 +19,9 @@ def write_results_to_file(diffs, args):
 
 
 def main(args):
-    couch = load_couch_server(args.conf)
+    with open(args.conf) as conf_file:
+        couch_conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
+    couch = load_couch_server(couch_conf)
 
     with open(args.oconf) as ocf:
         oconf = yaml.load(ocf, Loader=yaml.SafeLoader)["order_portal"]

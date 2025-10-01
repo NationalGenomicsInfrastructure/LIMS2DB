@@ -12,6 +12,7 @@ import os
 
 import genologics_sql.tables as tbls
 import markdown
+import yaml
 from genologics_sql.utils import get_session
 from sqlalchemy import text
 from sqlalchemy.orm import aliased
@@ -21,7 +22,9 @@ from LIMS2DB.utils import load_couch_server, send_mail
 
 def main(args):
     session = get_session()
-    couch = load_couch_server(args.conf)
+    with open(args.conf) as conf_file:
+        conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
+    couch = load_couch_server(conf)
     db = "running_notes"
 
     def get_researcher(userid):
