@@ -14,6 +14,7 @@ import genologics_sql.tables as tbls
 import markdown
 import yaml
 from genologics_sql.utils import get_session
+from ibm_cloud_sdk_core.api_exception import ApiException
 from sqlalchemy import text
 from sqlalchemy.orm import aliased
 
@@ -74,7 +75,10 @@ def main(args):
 
     def update_note_db(note):
         updated = False
-        note_existing = couch.get_document(db=db, doc_id=note["_id"]).get_result()
+        try:
+            note_existing = couch.get_document(db=db, doc_id=note["_id"]).get_result()
+        except ApiException:
+            note_existing = None
         if "_rev" in note.keys():
             del note["_rev"]
 
