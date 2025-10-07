@@ -4,9 +4,11 @@ import smtplib
 from datetime import date, timedelta
 from email.mime.text import MIMEText
 
+import yaml
 from genologics.config import BASEURI, PASSWORD, USERNAME
 from genologics.lims import Lims
-from statusdb.db.utils import load_couch_server
+
+from LIMS2DB.utils import load_couch_server
 
 
 def main(args):
@@ -15,8 +17,9 @@ def main(args):
     sixMonthsAgo = date.today() - timedelta(weeks=26)
     yesterday = date.today() - timedelta(days=1)
     pjs = lims.get_projects(open_date=sixMonthsAgo.strftime("%Y-%m-%d"))
-    statusdb = load_couch_server(args.conf)
-    proj_id_view = statusdb["projects"].view("project/project_id")
+    with open(args.conf) as conf_file:
+        conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
+    statusdb = load_couch_server(conf)
 
     operator = "par.lundin@scilifelab.se"
     summary = {}
@@ -149,7 +152,13 @@ def main(args):
                 )
 
             if completed:  # If we actually have stuff to mail
-                doc = statusdb["projects"].get(proj_id_view[p.id].rows[0].value)
+                doc = statusdb.post_view(
+                    db="projects",
+                    ddoc="project",
+                    view="project_id",
+                    key=p.id,
+                    include_docs=True,
+                ).get_result()["rows"][0]["doc"]
                 if "project_coordinator" in doc["details"]:
                     pc = doc["details"]["project_coordinator"]
                     summary[pc] = completed

@@ -1,5 +1,4 @@
 import copy
-import http.client as http_client
 import re
 from datetime import datetime
 
@@ -14,6 +13,7 @@ from genologics_sql.tables import (
     ReagentType,
     Researcher,
 )
+from ibm_cloud_sdk_core.api_exception import ApiException
 from requests import get as rget
 from sqlalchemy import text
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
@@ -21,195 +21,6 @@ from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 import LIMS2DB.objectsDB.process_categories as pc_cg
 from LIMS2DB.diff import diff_objects
 from LIMS2DB.utils import send_mail
-
-
-class Workset:
-    def __init__(self, lims, crawler, log):
-        self.log = log
-        self.name = set()
-        self.lims = lims
-        self.obj = {}
-        # get the identifier
-        outs = crawler.starting_proc.all_outputs()
-        for out in outs:
-            if out.type == "Analyte" and len(out.samples) == 1:
-                try:
-                    self.name.add(out.location[0].name)
-                except:
-                    self.log.warn(f"no name found for workset {out.id}")
-
-        try:
-            self.obj["name"] = self.name.pop()
-        except:
-            self.log.error(f"No name found for current workset {crawler.starting_proc.id}, might be an ongoing step.")
-            raise NameError
-        self.obj["technician"] = crawler.starting_proc.technician.initials
-        self.obj["id"] = crawler.starting_proc.id
-        self.obj["date_run"] = crawler.starting_proc.date_run
-        # only get the latest aggregate qc date
-        latest_date = 0
-        for agr in crawler.libaggre:
-            if agr.date_run > latest_date:
-                latest_date = agr.date_run
-        if not latest_date:
-            latest_date = None
-        self.obj["last_aggregate"] = latest_date
-        pjs = {}
-        for p in crawler.projects:
-            pjs[p.id] = {}
-            pjs[p.id]["name"] = p.name
-            try:
-                pjs[p.id]["library"] = p.udf["Library construction method"]
-            except KeyError:
-                pjs[p.id]["library"] = None
-            try:
-                pjs[p.id]["application"] = p.udf["Application"]
-            except KeyError:
-                pjs[p.id]["application"] = None
-            try:
-                pjs[p.id]["sequencing_setup"] = f"{p.udf['Sequencing platform']} {p.udf['Sequencing setup']}"
-            except KeyError:
-                pjs[p.id]["sequencing_setup"] = None
-
-            pjs[p.id]["samples"] = {}
-            for sample in crawler.samples:
-                if sample.project == p:
-                    pjs[p.id]["samples"][sample.name] = {}
-                    pjs[p.id]["samples"][sample.name]["library"] = {}
-                    pjs[p.id]["samples"][sample.name]["sequencing"] = {}
-                    try:
-                        pjs[p.id]["samples"][sample.name]["customer_name"] = sample.udf["Customer Name"]
-                    except KeyError:
-                        pjs[p.id]["samples"][sample.name]["customer_name"] = None
-
-                    pjs[p.id]["samples"][sample.name]["rec_ctrl"] = {}
-                    for i in crawler.starting_proc.all_inputs():
-                        if sample in i.samples:
-                            pjs[p.id]["samples"][sample.name]["rec_ctrl"]["status"] = i.qc_flag
-
-                    for output in crawler.starting_proc.all_outputs():
-                        if output.type == "Analyte" and sample in output.samples:
-                            pjs[p.id]["samples"][sample.name]["location"] = output.location[1]
-
-                    for lib in sorted(crawler.libaggre, key=lambda l: l.date_run, reverse=True):
-                        for inp in lib.all_inputs():
-                            if sample in inp.samples:
-                                onelib = {}
-                                onelib["status"] = inp.qc_flag
-                                onelib["art"] = inp.id
-                                onelib["date"] = lib.date_run
-                                onelib["name"] = lib.protocol_name
-                                onelib["id"] = lib.id
-                                if "Concentration" in inp.udf and "Conc. Units" in inp.udf:
-                                    onelib["concentration"] = "{} {}".format(
-                                        round(inp.udf["Concentration"], 2),
-                                        inp.udf["Conc. Units"],
-                                    )
-                                if "Molar Conc. (nM)" in inp.udf:
-                                    onelib["concentration"] = f"{round(inp.udf['Molar Conc. (nM)'], 2)} nM"
-                                if "Size (bp)" in inp.udf:
-                                    onelib["size"] = round(inp.udf["Size (bp)"], 2)
-                                if "NeoPrep Machine QC" in inp.udf and onelib["status"] == "UNKNOWN":
-                                    onelib["status"] = inp.udf["NeoPrep Machine QC"]
-
-                                pjs[p.id]["samples"][sample.name]["library"][lib.id] = onelib
-                                if "library_status" not in pjs[p.id]["samples"][sample.name]:
-                                    pjs[p.id]["samples"][sample.name]["library_status"] = inp.qc_flag
-
-                    for seq in sorted(crawler.seq, key=lambda s: s.date_run, reverse=True):
-                        for inp in seq.all_inputs():
-                            if sample in inp.samples:
-                                pjs[p.id]["samples"][sample.name]["sequencing"][seq.id] = {}
-                                pjs[p.id]["samples"][sample.name]["sequencing"][seq.id]["status"] = inp.qc_flag
-                                pjs[p.id]["samples"][sample.name]["sequencing"][seq.id]["date"] = seq.date_run
-                                if "sequencing_status" not in pjs[p.id]["samples"][sample.name]:
-                                    pjs[p.id]["samples"][sample.name]["sequencing_status"] = inp.qc_flag
-
-        self.obj["projects"] = pjs
-
-
-class LimsCrawler:
-    def __init__(self, lims, starting_proc=None, starting_inputs=None):
-        self.lims = lims
-        self.starting_proc = starting_proc
-        self.samples = set()
-        self.projects = set()
-        self.finlibinitqc = set()
-        self.initqc = set()
-        self.initaggr = set()
-        self.pooling = set()
-        self.preprepstart = set()
-        self.prepstart = set()
-        self.prepend = set()
-        self.libval = set()
-        self.finliblibval = set()
-        self.libaggre = set()
-        self.dilstart = set()
-        self.seq = set()
-        self.demux = set()
-        self.caliper = set()
-        self.projsum = set()
-        self.inputs = set()
-        if starting_proc:
-            for i in starting_proc.all_inputs():
-                if i.type == "Analyte":
-                    self.samples.update(i.samples)
-                    self.inputs.add(i)
-        if starting_inputs:
-            for i in starting_inputs:
-                if i.type == "Analyte":
-                    self.samples.update(i.samples)
-                    self.inputs.add(i)
-        for sample in self.samples:
-            if sample.project:
-                self.projects.add(sample.project)
-
-    def crawl(self, starting_step=None):
-        nextsteps = set()
-        if not starting_step:
-            if not self.starting_proc:
-                for i in self.inputs:
-                    if i.type == "Analyte" and (self.samples.intersection(i.samples)):
-                        nextsteps.update(self.lims.get_processes(inputartifactlimsid=i.id))
-            else:
-                starting_step = self.starting_proc
-        if starting_step:
-            for o in starting_step.all_outputs():
-                if o.type == "Analyte" and (self.samples.intersection(o.samples)):
-                    nextsteps.update(self.lims.get_processes(inputartifactlimsid=o.id))
-        for step in nextsteps:
-            if step.type.name in list(pc_cg.PREPREPSTART.values()):
-                self.preprepstart.add(step)
-            elif step.type.name in list(pc_cg.PREPSTART.values()):
-                self.prepstart.add(step)
-            elif step.type.name in list(pc_cg.PREPEND.values()):
-                self.prepend.add(step)
-            elif step.type.name in list(pc_cg.LIBVAL.values()):
-                self.libval.add(step)
-            elif step.type.name in list(pc_cg.AGRLIBVAL.values()):
-                self.libaggre.add(step)
-            elif step.type.name in list(pc_cg.SEQUENCING.values()):
-                self.seq.add(step)
-            elif step.type.name in list(pc_cg.DEMULTIPLEX.values()):
-                self.demux.add(step)
-            elif step.type.name in list(pc_cg.INITALQCFINISHEDLIB.values()):
-                self.finlibinitqc.add(step)
-            elif step.type.name in list(pc_cg.INITALQC.values()):
-                self.initqc.add(step)
-            elif step.type.name in list(pc_cg.AGRINITQC.values()):
-                self.initaggr.add(step)
-            elif step.type.name in list(pc_cg.POOLING.values()):
-                self.pooling.add(step)
-            elif step.type.name in list(pc_cg.DILSTART.values()):
-                self.dilstart.add(step)
-            elif step.type.name in list(pc_cg.SUMMARY.values()):
-                self.projsum.add(step)
-            elif step.type.name in list(pc_cg.CALIPER.values()):
-                self.caliper.add(step)
-
-            # if the step has analytes as outputs
-            if [x for x in step.all_outputs() if x.type == "Analyte"]:
-                self.crawl(starting_step=step)
 
 
 class Workset_SQL:
@@ -452,14 +263,19 @@ class ProjectSQL:
         doc = None
         # When running for a single project, sometimes the connection is lost so retry
         try:
-            self.couch["projects"]
-        except http_client.BadStatusLine:
+            self.couch.get_server_information().get_result()
+        except ApiException:
             self.log.warning(f"Access to couch failed before trying to save new doc for project {self.pid}")
             pass
-        db = self.couch["projects"]
-        view = db.view("project/project_id")
-        for row in view[self.pid]:
-            doc = db.get(row.id)
+        result = self.couch.post_view(
+            db="projects",
+            ddoc="project",
+            view="project_id",
+            key=self.pid,
+            include_docs=True,
+        ).get_result()["rows"]
+        if result:
+            doc = result[0]["doc"]
         if doc:
             fields_saved = [
                 "_id",
@@ -502,7 +318,11 @@ class ProjectSQL:
                     self.obj["order_details"] = doc["order_details"]
 
                 self.log.info(f"Trying to save new doc for project {self.pid}")
-                db.save(self.obj)
+                self.couch.put_document(
+                    db="projects",
+                    doc_id=self.obj["_id"],
+                    document=self.obj,
+                ).get_result()
                 if self.obj.get("details", {}).get("type", "") == "Application":
                     lib_method_text = f"Library method: {self.obj['details'].get('library_construction_method', 'N/A')}"
                     application = self.obj.get("details", {}).get("application", "")
@@ -514,12 +334,12 @@ class ProjectSQL:
                         if diffs["key  details contract_received"][1] == "missing":
                             old_contract_received = diffs["key  details contract_received"][0]
                             msg = f"Contract received on {old_contract_received} deleted for applications project "
-                            msg += f'<a href="{genstat_url}">{self.obj["project_id"]}, {self.obj["project_name"]}</a>[{lib_method_text}]\
+                            msg += f'<a href="{genstat_url}">{self.obj["project_id"]}, {self.obj["project_name"]}</a> [{lib_method_text}]\
                             {single_cell_text if is_single_cell else ""}.'
                         else:
                             contract_received = diffs["key  details contract_received"][1]
                             msg = "Contract received for applications project "
-                            msg += f'<a href="{genstat_url}">{self.obj["project_id"]}, {self.obj["project_name"]}</a>[{lib_method_text}]\
+                            msg += f'<a href="{genstat_url}">{self.obj["project_id"]}, {self.obj["project_name"]}</a> [{lib_method_text}]\
                             {single_cell_text if is_single_cell else ""} on {contract_received}.'
 
                         if is_single_cell:
@@ -537,7 +357,10 @@ class ProjectSQL:
             self.obj["creation_time"] = datetime.now().isoformat()
             self.obj["modification_time"] = self.obj["creation_time"]
             self.log.info(f"Trying to save new doc for project {self.pid}")
-            db.save(self.obj)
+            self.couch.post_document(
+                db="projects",
+                document=self.obj,
+            ).get_result()
             if self.obj.get("details", {}).get("type", "") == "Application":
                 genstat_url = f"{self.genstat_proj_url}{self.obj['project_id']}"
                 lib_method_text = f"Library method: {self.obj['details'].get('library_construction_method', 'N/A')}"
