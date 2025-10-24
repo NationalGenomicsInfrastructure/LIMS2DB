@@ -364,8 +364,7 @@ class ProjectSQL:
             if self.obj.get("details", {}).get("type", "") == "Application":
                 genstat_url = f"{self.genstat_proj_url}{self.obj['project_id']}"
                 lib_method_text = f"Library method: {self.obj['details'].get('library_construction_method', 'N/A')}"
-                msg = "New applications project created "
-                msg += f'<a href="{genstat_url}">{self.obj["project_id"]}, {self.obj["project_name"]}</a> [{lib_method_text}].'
+                msg = f'New applications project created <a href="{genstat_url}">{self.obj["project_id"]}, {self.obj["project_name"]}</a><span style="white-space: pre;"> [{lib_method_text}]</span>.'
                 send_mail(
                     f"GA Project created {self.obj['project_name']}",
                     msg,
