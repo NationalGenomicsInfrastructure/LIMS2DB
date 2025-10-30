@@ -175,6 +175,7 @@ WORKSET = {
     "204": "Setup Workset/Plate",
     "2656": "Deparafinization, H&E, Tissue Imaging",
     "2657": "Fixation, H&E, Tissue Imaging",
+    "2661": "Probe Elution and Pre-Amplification Clean-up",
 }
 SUMMARY = {"356": "Project Summary 1.3"}
 DEMULTIPLEX = {
