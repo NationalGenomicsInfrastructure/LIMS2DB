@@ -53,6 +53,8 @@ def main(args):
     def get_email(fullname):
         # shotgun
         # In multipart names, the first token is taken as first name and the rest taken as surname
+        if fullname == "unassigned":
+            return None
         names = fullname.split(" ", 1)
         try:
             researchers = lims.get_researchers(firstname=names[0], lastname=names[1])

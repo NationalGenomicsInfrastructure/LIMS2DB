@@ -1,5 +1,9 @@
 # LIMS2DB Version Log
 
+## 20251219.1
+
+Fix bug in mail_resp script when researcher name is unassigned
+
 ## 20250815.1
 
 Replace couchdb calls with cloudant; remove statusdb package dependency
