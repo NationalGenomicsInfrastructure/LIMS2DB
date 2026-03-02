@@ -168,7 +168,7 @@ def masterProcess(options, projectList, mainlims, logger, oconf=None):
     logger.info("ordering the project list")
     orderedprojectlist = sorted(
         projectList,
-        key=lambda x: (mainlims.get_sample_number(projectname=x.name)),
+        key=lambda x: mainlims.get_sample_number(projectname=x.name),
         reverse=True,
     )
     logger.info("done ordering the project list")
