@@ -725,16 +725,17 @@ class ProjectSQL:
                 except IndexError:
                     self.log.info(f"No libstart found for sample {sample.name}")
                     if str(one_libprep.typeid) in list(pc_cg.WORKSET.keys()):
-                        if (
-                            "first_prep_start_date" not in self.obj["samples"][sample.name]
-                            or datetime.strptime(
-                                self.obj["samples"][sample.name]["first_prep_start_date"],
-                                "%Y-%m-%d",
-                            )
-                            > one_libprep.daterun
-                        ):
-                            self.obj["samples"][sample.name]["first_prep_start_date"] = one_libprep.daterun.strftime("%Y-%m-%d")
-                        self.obj["samples"][sample.name]["library_prep"][prepname]["prep_start_date"] = one_libprep.daterun.strftime("%Y-%m-%d")
+                        if one_libprep.daterun:
+                            if (
+                                "first_prep_start_date" not in self.obj["samples"][sample.name]
+                                or datetime.strptime(
+                                    self.obj["samples"][sample.name]["first_prep_start_date"],
+                                    "%Y-%m-%d",
+                                )
+                                > one_libprep.daterun
+                            ):
+                                self.obj["samples"][sample.name]["first_prep_start_date"] = one_libprep.daterun.strftime("%Y-%m-%d")
+                            self.obj["samples"][sample.name]["library_prep"][prepname]["prep_start_date"] = one_libprep.daterun.strftime("%Y-%m-%d")
                 pend = get_children_processes(
                     self.session,
                     one_libprep.processid,
