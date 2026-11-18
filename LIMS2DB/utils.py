@@ -98,10 +98,10 @@ def match_samples_to_validation_errors(common_fields, samples, validation_errors
         sample = samples[row_number - 1]
         field = error.get("field")
         if field in common_fields:
-            if 'common' not in samples_with_errors:
-                samples_with_errors['common'] = []
-            if error["message"] not in samples_with_errors['common']:
-                samples_with_errors['common'].append(error["message"])
+            if "common" not in samples_with_errors:
+                samples_with_errors["common"] = []
+            if error["message"] not in samples_with_errors["common"]:
+                samples_with_errors["common"].append(error["message"])
         else:
             if sample not in samples_with_errors:
                 samples_with_errors[sample] = []

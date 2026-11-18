@@ -15,13 +15,13 @@ from genologics_sql.tables import (
 )
 from ibm_cloud_sdk_core.api_exception import ApiException
 from requests import get as rget
+from scilifelab_metadata_templates import genomics
 from sqlalchemy import text
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
 import LIMS2DB.objectsDB.process_categories as pc_cg
 from LIMS2DB.diff import diff_objects
 from LIMS2DB.utils import generate_tsv_template, match_samples_to_validation_errors, send_mail
-from scilifelab_metadata_templates import genomics
 
 
 class Workset_SQL:
