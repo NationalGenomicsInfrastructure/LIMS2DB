@@ -1,14 +1,11 @@
 import json
 import logging
 import logging.handlers
-import os
 import smtplib
-import tempfile
 from email.mime.text import MIMEText
 from importlib.resources import files
 
 from ibmcloudant import CouchDbSessionAuthenticator, cloudant_v1
-from scilifelab_metadata_templates import genomics
 
 
 # merges d2 in d1, keeps values from d1
@@ -88,48 +85,27 @@ def stillRunning(processList):
     return ret
 
 
-def validate_mock_tsv_file(tsv_source):
-    """Validate a mock TSV using the upstream genomics validator.
-
-    The validator only accepts a path, so we materialize the in-memory StringIO
-    content into a temporary file backed by RAM first and then call the upstream
-    validator on that filename.
-    """
-    temp_path = None
-    try:
-        tsv_source.seek(0)
-        content = tsv_source.getvalue()
-
-        with tempfile.NamedTemporaryFile(
-            mode="w+",
-            encoding="utf-8",
-            newline="",
-            suffix=".tsv",
-            delete=False,
-        ) as handle:
-            handle.write(content)
-            temp_path = handle.name
-
-        return genomics.validate_genomics_data(temp_path)
-
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.unlink(temp_path)
-
-
-def match_samples_to_validation_errors(samples, validation_errors):
+def match_samples_to_validation_errors(common_fields, samples, validation_errors):
     """Match samples to validation errors based on sample_alias.
 
     :param samples: List of samples
     :param validation_errors: List of validation error dictionaries
     :return: List of samples with validation errors
     """
-    samples_with_errors = []
+    samples_with_errors = {}
     for error in validation_errors:
         row_number = error.get("row")
         sample = samples[row_number - 1]
-        if sample not in samples_with_errors:
-            samples_with_errors.append(sample)
+        field = error.get("field")
+        if field in common_fields:
+            if 'common' not in samples_with_errors:
+                samples_with_errors['common'] = []
+            if error["message"] not in samples_with_errors['common']:
+                samples_with_errors['common'].append(error["message"])
+        else:
+            if sample not in samples_with_errors:
+                samples_with_errors[sample] = []
+            samples_with_errors[sample].append(error["message"])
 
     return samples_with_errors
 

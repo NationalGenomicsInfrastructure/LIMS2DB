@@ -1,6 +1,4 @@
 import copy
-import csv
-import io
 import re
 from datetime import date, datetime
 
@@ -22,7 +20,8 @@ from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
 import LIMS2DB.objectsDB.process_categories as pc_cg
 from LIMS2DB.diff import diff_objects
-from LIMS2DB.utils import generate_tsv_template, match_samples_to_validation_errors, send_mail, validate_mock_tsv_file
+from LIMS2DB.utils import generate_tsv_template, match_samples_to_validation_errors, send_mail
+from scilifelab_metadata_templates import genomics
 
 
 class Workset_SQL:
@@ -1273,7 +1272,6 @@ class ProjectSQL:
         """Check if the TSV file is valid for the project"""
         if self.obj.get("status_fields", {}).get("status", "") == "Ongoing":
             template = generate_tsv_template()
-            template_header = list(template.keys())
             if not self.inst_map:
                 self.inst_map = self.get_inst_map()
             common_details = {}
@@ -1302,12 +1300,6 @@ class ProjectSQL:
                 if read1 > 0:
                     if read2 > 0:
                         common_details["library_layout"] = "PAIRED"
-                        # Add reverse file name and md5 keys to the template header for paired end data
-                        template_header.insert(template_header.index("file_md5") + 1, "reverse_file_name")
-                        template_header.insert(
-                            template_header.index("reverse_file_name") + 1,
-                            "reverse_file_md5",
-                        )
                     else:
                         common_details["library_layout"] = "SINGLE"
                 else:
@@ -1329,12 +1321,10 @@ class ProjectSQL:
                     file_pairs_delivered[sample_name]["reverse_file_name"] = f"{sample_name}_R2_001.fastq.gz"
                     file_pairs_delivered[sample_name]["reverse_file_md5"] = "mock_md5_value"
 
-                tsv_buffer = io.StringIO()
-                writer = csv.DictWriter(tsv_buffer, fieldnames=template_header, delimiter="\t")
-                writer.writeheader()
+                tsv_data = []
                 for file_pair in file_pairs_delivered.values():
                     row = {**common_details, **file_pair}
-                    writer.writerow(row)
-                validation_errors = validate_mock_tsv_file(tsv_buffer)
+                    tsv_data.append(row)
+                validation_errors = genomics.validate_genomics_data(tsv_data=tsv_data)
                 if validation_errors:
-                    self.obj["samples_with_errors"] = match_samples_to_validation_errors(list(self.obj.get("samples", {}).values()), validation_errors)
+                    self.obj["samples_with_errors"] = match_samples_to_validation_errors(list(common_details.keys()), list(self.obj.get("samples", {}).values()), validation_errors)
