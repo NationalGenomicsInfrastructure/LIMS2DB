@@ -45,7 +45,7 @@ def main(args):
         review_ask,
         samples,
     ):
-        created_time = date.astimezone(datetime.timezone.utc)
+        created_time = date.astimezone(datetime.UTC)
         # Apparently inserting raw html works in markdown
         lims_link = f"<a href='https://ngi-lims-prod.scilifelab.se/clarity/work-complete/{processid}' target='_blank'>LIMS</a>"
         researcher_name = f"{researcher.firstname} {researcher.lastname}"

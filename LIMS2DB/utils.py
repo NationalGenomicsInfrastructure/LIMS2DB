@@ -1,7 +1,9 @@
+import json
 import logging
 import logging.handlers
 import smtplib
 from email.mime.text import MIMEText
+from importlib.resources import files
 
 from ibmcloudant import CouchDbSessionAuthenticator, cloudant_v1
 
@@ -81,6 +83,45 @@ def stillRunning(processList):
             ret = True
 
     return ret
+
+
+def match_samples_to_validation_errors(common_fields, samples, validation_errors):
+    """Match samples to validation errors based on sample_alias.
+
+    :param samples: List of samples
+    :param validation_errors: List of validation error dictionaries
+    :return: List of samples with validation errors
+    """
+    samples_with_errors = {}
+    for error in validation_errors:
+        row_number = error.get("row")
+        sample = samples[row_number - 1]
+        field = error.get("field")
+        if field in common_fields:
+            if "common" not in samples_with_errors:
+                samples_with_errors["common"] = []
+            if error["message"] not in samples_with_errors["common"]:
+                samples_with_errors["common"].append(error["message"])
+        else:
+            if sample not in samples_with_errors:
+                samples_with_errors[sample] = []
+            samples_with_errors[sample].append(error["message"])
+
+    return samples_with_errors
+
+
+def generate_tsv_template():
+    """Generates a TSV template based on the genomics metadata template.
+    :return: TSV template as a dictionary with default values
+    """
+    ena_tsv_metadata = json.loads(files("scilifelab_metadata_templates.genomics").joinpath("templates/genomics_technical_metadata_schema.json").read_text())
+    tsv_file_headers = list(ena_tsv_metadata.get("properties", {}).keys())
+    tsv_file_headers.remove("reverse_file_name")  # Remove reverse file name and md5 as they
+    tsv_file_headers.remove("reverse_file_md5")  # will be added later in case of paired reads
+    version = ena_tsv_metadata.get("version", "")
+    template = {header: "" for header in tsv_file_headers}
+    template["template_version"] = version
+    return template
 
 
 class QueueHandler(logging.Handler):

@@ -101,6 +101,8 @@ def processPSUL(options, queue, logqueue, oconf=None):
     with open(options.conf) as conf_file:
         couch_conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
     couch = load_couch_server(couch_conf)
+    # get common config
+    instrument_mapping = couch.get_document(db="gs_configs", doc_id="metadata_instrument_mapping").get_result().get("instruments", {})
     db_session = get_session()
     work = True
     procName = mp.current_process().name
@@ -140,7 +142,7 @@ def processPSUL(options, queue, logqueue, oconf=None):
                 try:
                     pj_id = db_session.query(DBProject.luid).filter(DBProject.name == projname).scalar()
                     host = get_configuration()["url"]
-                    P = ProjectSQL(db_session, proclog, pj_id, host, couch, oconf)
+                    P = ProjectSQL(db_session, proclog, pj_id, host, couch, oconf, inst_map=instrument_mapping)
                     P.save()
                 except:
                     error = sys.exc_info()
