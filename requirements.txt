@@ -4,6 +4,7 @@ ibmcloudant
 markdown
 pyyaml
 requests
+scilifelab-metadata-templates[genomics] @ git+https://github.com/ScilifelabDataCentre/scilifelab-metadata-templates.git@main
 setuptools
 six
 sqlalchemy

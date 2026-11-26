@@ -1,6 +1,6 @@
 import copy
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from genologics_sql.queries import get_children_processes, get_currentsteps_protocol_for_sample, get_processes_in_history, get_protocolstep_details
 from genologics_sql.tables import (
@@ -15,12 +15,13 @@ from genologics_sql.tables import (
 )
 from ibm_cloud_sdk_core.api_exception import ApiException
 from requests import get as rget
+from scilifelab_metadata_templates import genomics
 from sqlalchemy import text
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
 import LIMS2DB.objectsDB.process_categories as pc_cg
 from LIMS2DB.diff import diff_objects
-from LIMS2DB.utils import send_mail
+from LIMS2DB.utils import generate_tsv_template, match_samples_to_validation_errors, send_mail
 
 
 class Workset_SQL:
@@ -238,7 +239,7 @@ class Workset_SQL:
 
 
 class ProjectSQL:
-    def __init__(self, session, log, pid, host, couch=None, oconf=None):
+    def __init__(self, session, log, pid, host, couch=None, oconf=None, inst_map=None):
         self.log = log
         self.pid = pid
         self.host = host
@@ -246,6 +247,7 @@ class ProjectSQL:
         self.session = session
         self.couch = couch
         self.oconf = oconf
+        self.inst_map = inst_map
         self.genstat_proj_url = "https://genomics-status.scilifelab.se/project/"
         self.step_defs = {}
         self.obj = {}
@@ -258,6 +260,7 @@ class ProjectSQL:
         self.get_escalations()
         self.get_samples()
         self.set_status()
+        self.check_tsv_file_validity()
 
     def save(self, update_modification_time=True):
         doc = None
@@ -1252,3 +1255,76 @@ class ProjectSQL:
                     status_fields["pending"] = True
 
         self.obj["status_fields"] = status_fields
+
+    def get_inst_map(self):
+        """Get the instrument model mapping from the configuration"""
+        result = self.couch.get_document(
+            db="gs_configs",
+            doc_id="metadata_instrument_mappings",
+        ).get_result()
+        if result and "instruments" in result:
+            return result["instruments"]
+        else:
+            self.log.error("Instrument mapping not found in the configuration.")
+            return {}
+
+    def check_tsv_file_validity(self):
+        """Check if the TSV file is valid for the project"""
+        if self.obj.get("status_fields", {}).get("status", "") == "Ongoing":
+            template = generate_tsv_template()
+            if not self.inst_map:
+                self.inst_map = self.get_inst_map()
+            common_details = {}
+            file_pairs_delivered = {}
+            common_details["study_alias"] = "Needs to be filled in by submitter"
+            common_details["sample_alias"] = "Needs to be filled in by submitter"
+            common_details["instrument_model"] = self.inst_map.get(self.obj["details"].get("sequencing_platform", ""), "")
+            common_details["library_source"] = self.obj["details"].get("library_source", "")
+            common_details["library_selection"] = self.obj["details"].get("library_selection", "")
+            common_details["library_strategy"] = self.obj["details"].get("library_strategy", "")
+            common_details["insert_size"] = self.obj["details"].get("insert_size_aimed_for", "")
+            common_details["library_construction_protocol"] = self.obj["details"].get("library_construction_method", "") + " - Please contact support@ngisweden.se"
+
+            common_details["scilifelab_unit"] = "NGI Stockholm"
+            common_details["unit_internal_project_id"] = self.pid
+            common_details["order_id"] = self.obj["details"].get("portal_id", "")
+            common_details["metadata_file_creation_date"] = str(date.today())
+            common_details["template_name"] = "genomics_template"
+            common_details["template_version"] = template.get("template_version", "")
+
+            seq_setup = self.obj["details"].get("sequencing_setup", "")
+            seq_setup_match = re.search(r"^(\d+)-(.+)-(.+)-(\d+)$", seq_setup)
+            if seq_setup_match:
+                read1, _, _, read2 = seq_setup_match.groups()
+                read1, read2 = int(read1), int(read2)
+                if read1 > 0:
+                    if read2 > 0:
+                        common_details["library_layout"] = "PAIRED"
+                    else:
+                        common_details["library_layout"] = "SINGLE"
+                else:
+                    common_details["library_layout"] = "UNKNOWN"
+            else:
+                common_details["library_layout"] = "UNKNOWN"
+
+            for sample in self.obj.get("samples", {}).values():
+                sample_name = sample.get("scilife_name")
+                file_pairs_delivered[sample_name] = {
+                    "file_type": "fastq",
+                    "file_name": f"{sample_name}_R1_001.fastq.gz",
+                    "file_md5": "mock_md5_value",
+                    "experimental_sample_id": sample_name,
+                    "library_name": sample_name,
+                    "associated_sample_id": sample.get("customer_name", ""),
+                }
+                if common_details["library_layout"] == "PAIRED":
+                    file_pairs_delivered[sample_name]["reverse_file_name"] = f"{sample_name}_R2_001.fastq.gz"
+                    file_pairs_delivered[sample_name]["reverse_file_md5"] = "mock_md5_value"
+
+                tsv_data = []
+                for file_pair in file_pairs_delivered.values():
+                    row = {**common_details, **file_pair}
+                    tsv_data.append(row)
+                validation_errors = genomics.validate_genomics_data(tsv_data=tsv_data)
+                if validation_errors:
+                    self.obj["samples_with_errors"] = match_samples_to_validation_errors(list(common_details.keys()), list(self.obj.get("samples", {}).values()), validation_errors)
