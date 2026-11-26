@@ -1321,10 +1321,10 @@ class ProjectSQL:
                     file_pairs_delivered[sample_name]["reverse_file_name"] = f"{sample_name}_R2_001.fastq.gz"
                     file_pairs_delivered[sample_name]["reverse_file_md5"] = "mock_md5_value"
 
-                tsv_data = []
-                for file_pair in file_pairs_delivered.values():
-                    row = {**common_details, **file_pair}
-                    tsv_data.append(row)
-                validation_errors = genomics.validate_genomics_data(tsv_data=tsv_data)
-                if validation_errors:
-                    self.obj["samples_with_errors"] = match_samples_to_validation_errors(list(common_details.keys()), list(self.obj.get("samples", {}).values()), validation_errors)
+            tsv_data = []
+            for file_pair in file_pairs_delivered.values():
+                row = {**common_details, **file_pair}
+                tsv_data.append(row)
+            validation_errors = genomics.validate_genomics_data(tsv_data=tsv_data)
+            if validation_errors:
+                self.obj["samples_with_errors"] = match_samples_to_validation_errors(list(common_details.keys()), list(self.obj.get("samples", {}).keys()), validation_errors)
